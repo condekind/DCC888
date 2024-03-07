@@ -83,8 +83,16 @@ def test_min3(x, y, z):
     return env.get("answer")
 
 
-def equals(dst, v1, v2, next_if_true: Inst, next_if_false: Inst):
-    """Requires both "zero": 0 and "one": 1 in your Env."""
+def equals(dst, v1, v2, next_if_true: Inst, next_if_false: Inst, env: Optional[Env] = None):
+    """
+    Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
+    If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
+    """
+    if env is not None:
+        env.set("zero", 0)
+        env.set("one", 1)
+        # Otherwise, we assume the user has these definitions
+
     ans_true = Lth(dst, "zero", "one")
     ans_false = Lth(dst, "one", "zero")
     lt0 = Lth("__lt0_equals__", v1, v2)
