@@ -1,4 +1,5 @@
 from lang import *
+import sys
 
 
 def test_min(m, n):
@@ -60,7 +61,25 @@ def test_min3(x, y, z):
         >>> test_min3(5, 4, 3)
         3
     """
-    # TODO: Implement this method
+    env = Env({"x": x, "y": y, "z": z, "zero": 0})
+
+    x_ans = Add("answer", "x", "zero")
+    y_ans = Add("answer", "y", "zero")
+    z_ans = Add("answer", "z", "zero")
+
+    x_lt_y = Lth("x_lt_y", "x", "y")
+    x_lt_z = Lth("x_lt_z", "x", "z")
+    y_lt_z = Lth("y_lt_z", "y", "z")
+
+    b0 = Bt("x_lt_z", x_ans, z_ans)
+    b1 = Bt("y_lt_z", y_ans, z_ans)
+    b2 = Bt("x_lt_y", x_lt_z, y_lt_z)
+
+    x_lt_y.add_next(b2)
+    x_lt_z.add_next(b0)
+    y_lt_z.add_next(b1)
+
+    interp(x_lt_y, env)
     return env.get("answer")
 
 
