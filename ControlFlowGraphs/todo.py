@@ -83,6 +83,58 @@ def test_min3(x, y, z):
     return env.get("answer")
 
 
+def equals(dst, v1, v2, next_if_true: Inst, next_if_false: Inst):
+    """Requires both "zero": 0 and "one": 1 in your Env."""
+    ans_true = Lth(dst, "zero", "one")
+    ans_false = Lth(dst, "one", "zero")
+    lt0 = Lth("__lt0_equals__", v1, v2)
+    lt1 = Lth("__lt1_equals__", v2, v1)
+    bt_second_false = Bt("__lt1_equals__", ans_false, ans_true)
+    bt_first_false = Bt("__lt0_equals__", ans_false, bt_second_false)
+    lt0.add_next(lt1)
+    lt1.add_next(bt_first_false)
+    return lt0
+
+
+def test_equals(x, y):
+    """
+    >>> test_equals(3, 0)
+    False
+    >>> test_equals(0, 3)
+    False
+    >>> test_equals(32, 8)
+    False
+    >>> test_equals(3, 2)
+    False
+    >>> test_equals(2, 3)
+    False
+    >>> test_equals(3, 3)
+    True
+    >>> test_equals(0, 0)
+    True
+    >>> test_equals(1, 1)
+    True
+    >>> test_equals(True, True)
+    True
+    >>> test_equals(False, True)
+    False
+    >>> test_equals(True, False)
+    False
+    >>> test_equals(False, False)
+    True
+    """
+    env = Env({"x": x, "y": y, "one": 1, "zero": 0})
+
+    v1 = "x"
+    v2 = "y"
+    ans_true = Lth("answer", "zero", "one")
+    ans_false = Lth("answer", "one", "zero")
+
+    lt0 = equals("answer", v1, v2, ans_true, ans_false)
+    interp(lt0, env)
+    return env.get("answer")
+
+
 def test_div(m, n):
     """
     Stores in the variable 'answer' the integer division of 'm' and 'n'.
