@@ -83,7 +83,7 @@ def test_min3(x, y, z):
     return env.get("answer")
 
 
-def Eq(dst, v1, v2, next_if_true: Inst, next_if_false: Inst, env: Optional[Env] = None):
+def Eq(dst, v1, v2, env: Optional[Env] = None):
     """
     Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
     If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
@@ -138,7 +138,7 @@ def test_equals(x, y):
     ans_true = Lth("answer", "zero", "one")
     ans_false = Lth("answer", "one", "zero")
 
-    lt0 = Eq("answer", v1, v2, ans_true, ans_false)
+    lt0 = Eq("answer", v1, v2)
     interp(lt0, env)
     return env.get("answer")
 
@@ -191,8 +191,6 @@ def test_and(x, y):
     True
     """
     env = Env({"x": x, "y": y, "one": 1, "zero": 0})
-    ans_true = Lth("answer", "zero", "one")
-    ans_false = Lth("answer", "one", "zero")
 
     and0 = And("answer", "x", "y")
     interp(and0, env)
