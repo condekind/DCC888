@@ -1,6 +1,12 @@
 from lang import *
 import sys
 
+def call_counter(func):
+    def wrapper(*args, **kwargs):
+        wrapper.num_calls += 1
+        return func(*args, **kwargs)
+    wrapper.num_calls = 0
+    return wrapper
 
 def test_min(m, n):
     """
@@ -83,11 +89,13 @@ def test_min3(x, y, z):
     return env.get("answer")
 
 
+@call_counter
 def Eq(dst, v1, v2, env: Optional[Env] = None):
     """
     Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
     If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
     """
+
     if env is not None:
         env.set("zero", 0)
         env.set("one", 1)
@@ -95,13 +103,17 @@ def Eq(dst, v1, v2, env: Optional[Env] = None):
 
     ans_true = Lth(dst, "zero", "one")
     ans_false = Lth(dst, "one", "zero")
-    lt0 = Lth("__lt0_equals__", v1, v2)
-    lt1 = Lth("__lt1_equals__", v2, v1)
-    bt_second_false = Bt("__lt1_equals__", ans_false, ans_true)
-    bt_first_false = Bt("__lt0_equals__", ans_false, bt_second_false)
+
+    lt0 = Lth(f"__lt0_equals_{Eq.num_calls}__", v1, v2)
+    lt1 = Lth(f"__lt1_equals_{Eq.num_calls}__", v2, v1)
+    bt_second_false = Bt(f"__lt1_equals_{Eq.num_calls}__", ans_false, ans_true)
+    bt_first_false = Bt(f"__lt0_equals_{Eq.num_calls}__", ans_false, bt_second_false)
     lt0.add_next(lt1)
     lt1.add_next(bt_first_false)
-    return lt0
+
+    # We return both possible exit nodes, so the caller might assign a next
+    # node to both, even though one of them is unreachable
+    return (lt0, ans_true, ans_false)
 
 
 def test_equals(x, y):
@@ -135,14 +147,57 @@ def test_equals(x, y):
 
     v1 = "x"
     v2 = "y"
-    ans_true = Lth("answer", "zero", "one")
-    ans_false = Lth("answer", "one", "zero")
 
-    lt0 = Eq("answer", v1, v2)
+    lt0, *_ = Eq("answer", v1, v2)
+
     interp(lt0, env)
     return env.get("answer")
 
 
+def test_if_equals(x, y):
+    """
+    >>> test_if_equals(3, 0)
+    False
+    >>> test_if_equals(0, 3)
+    False
+    >>> test_if_equals(32, 8)
+    False
+    >>> test_if_equals(3, 2)
+    False
+    >>> test_if_equals(2, 3)
+    False
+    >>> test_if_equals(3, 3)
+    True
+    >>> test_if_equals(0, 0)
+    True
+    >>> test_if_equals(1, 1)
+    True
+    >>> test_if_equals(True, True)
+    True
+    >>> test_if_equals(False, True)
+    False
+    >>> test_if_equals(True, False)
+    False
+    >>> test_if_equals(False, False)
+    True
+    """
+    env = Env({"x": x, "y": y, "one": 1, "zero": 0})
+
+    v1 = "x"
+    v2 = "y"
+    ans_true = Lth("answer", "zero", "one")
+    ans_false = Lth("answer", "one", "zero")
+
+    lt0, if_true, if_false = Eq("is_eq", v1, v2)
+    b0 = Bt("is_eq", ans_true, ans_false)
+    if_true.add_next(b0)
+    if_false.add_next(b0)
+
+    interp(lt0, env)
+    return env.get("answer")
+
+
+@call_counter
 def And(dst, v1, v2, env: Optional[Env] = None):
     """
     Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
@@ -156,12 +211,13 @@ def And(dst, v1, v2, env: Optional[Env] = None):
     ans_true = Lth(dst, "zero", "one")
     ans_false = Lth(dst, "one", "zero")
 
-    m0 = Mul("__m0_and__", v1, v2)
-    ge0 = Geq("__ge_and__", "__m0_and__", "one")
-    b0 = Bt("__ge_and__", ans_true, ans_false)
+    m0 = Mul( f"__m0_and_{And.num_calls}__", v1, v2)
+    ge0 = Geq(f"__ge_and_{And.num_calls}__", f"__m0_and_{And.num_calls}__", "one")
+    b0 = Bt(f"__ge_and_{And.num_calls}__", ans_true, ans_false)
     m0.add_next(ge0)
     ge0.add_next(b0)
     return m0
+
 
 def test_and(x, y):
     """
@@ -193,6 +249,7 @@ def test_and(x, y):
     env = Env({"x": x, "y": y, "one": 1, "zero": 0})
 
     and0 = And("answer", "x", "y")
+
     interp(and0, env)
     return env.get("answer")
 
