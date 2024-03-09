@@ -143,6 +143,63 @@ def test_equals(x, y):
     return env.get("answer")
 
 
+def And(dst, v1, v2, env: Optional[Env] = None):
+    """
+    Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
+    If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
+    """
+    #print(f"And {v1 = } {v2 = }", file=sys.stderr)
+    if env is not None:
+        env.set("zero", 0)
+        env.set("one", 1)
+        # Otherwise, we assume the user has these definitions
+
+    ans_true = Lth(dst, "zero", "one")
+    ans_false = Lth(dst, "one", "zero")
+
+    m0 = Mul("__m0_and__", v1, v2)
+    ge0 = Geq("__ge_and__", "__m0_and__", "one")
+    b0 = Bt("__ge_and__", ans_true, ans_false)
+    m0.add_next(ge0)
+    ge0.add_next(b0)
+    return m0
+
+def test_and(x, y):
+    """
+    >>> test_and(True, True)
+    True
+    >>> test_and(False, True)
+    False
+    >>> test_and(True, False)
+    False
+    >>> test_and(False, False)
+    False
+    >>> test_and(3, 0)
+    False
+    >>> test_and(0, 3)
+    False
+    >>> test_and(32, 8)
+    True
+    >>> test_and(3, 2)
+    True
+    >>> test_and(2, 3)
+    True
+    >>> test_and(3, 3)
+    True
+    >>> test_and(0, 0)
+    False
+    >>> test_and(1, 1)
+    True
+    """
+    env = Env({"x": x, "y": y, "one": 1, "zero": 0})
+    ans_true = Lth("answer", "zero", "one")
+    ans_false = Lth("answer", "one", "zero")
+
+    and0 = And("answer", "x", "y")
+    interp(and0, env)
+    return env.get("answer")
+
+
 def test_div(m, n):
     """
     Stores in the variable 'answer' the integer division of 'm' and 'n'.
