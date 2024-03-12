@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 from lang import *
-import sys
+from inst2dot import DotMaker, dotgen
+
 
 def call_counter(func):
     def wrapper(*args, **kwargs):
         wrapper.num_calls += 1
         return func(*args, **kwargs)
+
     wrapper.num_calls = 0
     return wrapper
 
+
+@dotgen(ofile_prefix="archive")
 def test_min(m, n):
     """
     Stores in the variable 'answer' the minimum of 'm' and 'n'
@@ -28,6 +34,7 @@ def test_min(m, n):
     return env.get("answer")
 
 
+@dotgen(ofile_prefix="archive")
 def test_fib(n):
     """
     Stores in the variable 'answer' the n-th number of the Fibonacci sequence.
@@ -57,6 +64,7 @@ def test_fib(n):
     return env.get("answer")
 
 
+@dotgen(ofile_prefix="archive")
 def test_min3(x, y, z):
     """
     Stores in the variable 'answer' the minimum of 'x', 'y' and 'z'
@@ -67,6 +75,7 @@ def test_min3(x, y, z):
         >>> test_min3(5, 4, 3)
         3
     """
+    # DotMaker.enable("test_min3.dot")
     env = Env({"x": x, "y": y, "z": z, "zero": 0})
 
     x_ans = Add("answer", "x", "zero")
@@ -85,12 +94,15 @@ def test_min3(x, y, z):
     x_lt_z.add_next(b0)
     y_lt_z.add_next(b1)
 
+    # DotMaker.write()
+    # DotMaker.disable("test_min3.dot")
+
     interp(x_lt_y, env)
     return env.get("answer")
 
 
 @call_counter
-def Eq(dst, v1, v2, env: Optional[Env] = None):
+def Eq(dst, v1, v2, env: Env | None = None):
     """
     Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
     If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
@@ -104,10 +116,10 @@ def Eq(dst, v1, v2, env: Optional[Env] = None):
     ans_true = Lth(dst, "zero", "one")
     ans_false = Lth(dst, "one", "zero")
 
-    lt0 = Lth(f"__lt0_equals_{Eq.num_calls}__", v1, v2)
-    lt1 = Lth(f"__lt1_equals_{Eq.num_calls}__", v2, v1)
-    bt_second_false = Bt(f"__lt1_equals_{Eq.num_calls}__", ans_false, ans_true)
-    bt_first_false = Bt(f"__lt0_equals_{Eq.num_calls}__", ans_false, bt_second_false)
+    lt0 = Lth(f"_lt0_equals_{Eq.num_calls}", v1, v2)
+    lt1 = Lth(f"_lt1_equals_{Eq.num_calls}", v2, v1)
+    bt_second_false = Bt(f"_lt1_equals_{Eq.num_calls}", ans_false, ans_true)
+    bt_first_false = Bt(f"_lt0_equals_{Eq.num_calls}", ans_false, bt_second_false)
     lt0.add_next(lt1)
     lt1.add_next(bt_first_false)
 
@@ -116,6 +128,7 @@ def Eq(dst, v1, v2, env: Optional[Env] = None):
     return (lt0, ans_true, ans_false)
 
 
+@dotgen(ofile_prefix="archive")
 def test_equals(x, y):
     """
     >>> test_equals(3, 0)
@@ -154,6 +167,7 @@ def test_equals(x, y):
     return env.get("answer")
 
 
+@dotgen(ofile_prefix="archive")
 def test_if_equals(x, y):
     """
     >>> test_if_equals(3, 0)
@@ -198,7 +212,7 @@ def test_if_equals(x, y):
 
 
 @call_counter
-def And(dst, v1, v2, env: Optional[Env] = None):
+def And(dst, v1, v2, env: Env | None = None):
     """
     Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
     If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
@@ -211,14 +225,15 @@ def And(dst, v1, v2, env: Optional[Env] = None):
     ans_true = Lth(dst, "zero", "one")
     ans_false = Lth(dst, "one", "zero")
 
-    m0 = Mul( f"__m0_and_{And.num_calls}__", v1, v2)
-    ge0 = Geq(f"__ge_and_{And.num_calls}__", f"__m0_and_{And.num_calls}__", "one")
-    b0 = Bt(f"__ge_and_{And.num_calls}__", ans_true, ans_false)
+    m0 = Mul(f"_m0_and_{And.num_calls}", v1, v2)
+    ge0 = Geq(f"_ge_and_{And.num_calls}", f"_m0_and_{And.num_calls}", "one")
+    b0 = Bt(f"_ge_and_{And.num_calls}", ans_true, ans_false)
     m0.add_next(ge0)
     ge0.add_next(b0)
     return m0
 
 
+@dotgen(ofile_prefix="archive")
 def test_and(x, y):
     """
     >>> test_and(True, True)

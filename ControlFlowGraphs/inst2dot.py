@@ -12,12 +12,15 @@ def _indent(depth=1, spaces=4):
 
 @final
 class DotMaker:
-    _dot_new_graph = f"digraph cfg {{\n{_indent()}node [shape=box];\n\n"
+    _dot_new_graph = (
+        f"digraph cfg {{\n"
+        f'{_indent()}fontname="Courier New"\n'
+        f"{_indent()}node [shape=box];\n\n"
+    )
     _node_cnt = 0
     _is_active = False
     _ofile = "/dev/null"
     dot = ""
-    indent_width = 4
 
     def __new__(self):
         raise RuntimeError("This class only contains static methods.")
@@ -101,7 +104,7 @@ def _append_dot(content: str, depth: int = 1):
     DotMaker.dot += f"{_indent(depth=depth)}{content}"
 
 
-def dotgen(func):
+def dot(func):
     """
     This decorator allows dot code generation for a CFG. The state is stored in
     private attributes of DotMaker and the state is only altered (i.e., dot
@@ -152,35 +155,81 @@ def dotgen(func):
 
         if itype == "lang.Bt":
             dstTrue, dstFalse = instance.NEXTS
-            _append_dot(f'{instance.id} [label="bt {instance.cond}"];\n')
+            _append_dot(
+                f'{instance.id} [fontname="Courier New" label="bt {instance.cond}"];\n'
+            )
             _append_dot(f"{instance.id} -> {dstTrue.id};\n")
             _append_dot(f"{instance.id} -> {dstFalse.id};\n")
 
         # We assume a BinOp can't have Bt as one of its sources (src0, src1)
         elif itype == "lang.Add":
             _append_dot(
-                f'{instance.id} [label="{instance.dst} = '
+                f'{instance.id} [fontname="Courier New" label="{instance.dst} = '
                 f'{instance.src0} + {instance.src1}"];\n'
             )
 
         elif itype == "lang.Mul":
             _append_dot(
-                f'{instance.id} [label="{instance.dst} = '
+                f'{instance.id} [fontname="Courier New" label="{instance.dst} = '
                 f'{instance.src0} * {instance.src1}"];\n'
             )
 
         elif itype == "lang.Lth":
             _append_dot(
-                f'{instance.id} [label="{instance.dst} = '
+                f'{instance.id} [fontname="Courier New" label="{instance.dst} = '
                 f'{instance.src0} < {instance.src1} ? True : False"];\n'
             )
 
         elif itype == "lang.Geq":
             _append_dot(
-                f'{instance.id} [label="{instance.dst} = '
+                f'{instance.id} [fontname="Courier New" label="{instance.dst} = '
                 f'{instance.src0} >= {instance.src1} ? True : False"];\n'
             )
 
         return result
 
     return wrapper
+
+
+from functools import wraps
+from pathlib import Path
+
+
+def dotgen(
+    ofile: str | PathLike | None = None, ofile_prefix: str | PathLike | None = None
+):
+    """
+    This is a decorator factory that takes an optional file name (the default
+    value used is the decorated function's name with a '.dot' suffix).
+    It enables DotMaker at the start of the function, and before returning,
+    writes the dot code to ofile, then disables DotMaker.
+    If the default name is desired but not the location, an optional prefix
+    can be provided through ofile_prefix, which will be prepended to ofile
+    (it doesn't have to end with a forward slash)
+    """
+
+    def decorator(func):
+        # If ofile is not provided, use func name with '.dot' suffix
+        nonlocal ofile
+        if ofile is None:
+            ofile = func.__name__ + ".dot"
+
+        nonlocal ofile_prefix
+        if ofile_prefix is None:
+            ofile_prefix = Path(".")
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if not DotMaker.is_enabled():
+                DotMaker.enable(Path(ofile_prefix) / ofile)
+
+            result = func(*args, **kwargs)
+
+            DotMaker.write()
+            DotMaker.disable()
+
+            return result
+
+        return wrapper
+
+    return decorator
