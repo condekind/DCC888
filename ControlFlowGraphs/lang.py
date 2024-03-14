@@ -16,7 +16,6 @@ Python 3. It will not work with standard Python 2.
 
 from collections import deque
 from abc import ABC, abstractmethod
-from inst2dot import dot
 
 
 class Env:
@@ -82,7 +81,6 @@ class Inst(ABC):
         self.NEXTS = []
         self.index = 0
 
-    @dot
     def add_next(self, next_inst):
         self.NEXTS.append(next_inst)
 
@@ -110,9 +108,7 @@ class BinOp(Inst):
     defined value, and the list of used values.
     """
 
-    @dot
     def __init__(s, dst, src0, src1):
-        s.id = f"i{id(s)}"
         s.dst = dst
         s.src0 = src0
         s.src1 = src1
@@ -201,10 +197,8 @@ class Bt(Inst):
         True
     """
 
-    @dot
     def __init__(s, cond, true_dst=None, false_dst=None):
         super().__init__()
-        s.id = f"b{id(s)}"
         s.cond = cond
         s.NEXTS = [true_dst, false_dst]
 

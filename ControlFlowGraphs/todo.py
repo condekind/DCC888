@@ -1,11 +1,77 @@
-from __future__ import annotations
-
-from ControlFlowGraphs.helpers import And, Ne
 from lang import *
-from inst2dot import dotgen
 
 
-@dotgen(ofile_prefix="archive")
+def call_counter(func):
+    """
+    Decorator for helper functions (pseudo-instructions) that offers a unique
+    identifier to be used when naming instantiated nodes. That way, multiple
+    calls to these helpers won't result in nodes with identical register names.
+
+    Nodes instantiated from helper functions should always store values in
+    registers starting with underscore, to prevent clashes with existing names.
+    """
+
+    def wrapper(*args, **kwargs):
+        wrapper.num_calls += 1
+        return func(*args, **kwargs)
+
+    wrapper.num_calls = 0
+    return wrapper
+
+
+@call_counter
+def Ne(dst, v1, v2, env = None):
+    """
+    Helper function for "not equals"
+
+    Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
+    If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
+    """
+
+    if env is not None:
+        env.set("zero", 0)
+        env.set("one", 1)
+        # Otherwise, we assume the user has these definitions
+
+    ans_true = Lth(dst, "zero", "one")
+    ans_false = Lth(dst, "one", "zero")
+
+    lt0 = Lth(f"_lt0_ne_{Ne.num_calls}", v1, v2)
+    lt1 = Lth(f"_lt1_ne_{Ne.num_calls}", v2, v1)
+    bt_second_false = Bt(f"_lt1_ne_{Ne.num_calls}", ans_true, ans_false)
+    bt_first_false = Bt(f"_lt0_ne_{Ne.num_calls}", ans_true, bt_second_false)
+    lt0.add_next(lt1)
+    lt1.add_next(bt_first_false)
+
+    # We return both possible exit nodes, so the caller might assign a next
+    # node to both, even though one of them is unreachable
+    return (lt0, ans_true, ans_false)
+
+
+@call_counter
+def And(dst, v1, v2, env = None):
+    """
+    Helper function for "logical AND"
+
+    Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
+    If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
+    """
+    if env is not None:
+        env.set("zero", 0)
+        env.set("one", 1)
+        # Otherwise, we assume the user has these definitions
+
+    ans_true = Lth(dst, "zero", "one")
+    ans_false = Lth(dst, "one", "zero")
+
+    m0 = Mul(f"_m0_and_{And.num_calls}", v1, v2)
+    ge0 = Geq(f"_ge_and_{And.num_calls}", f"_m0_and_{And.num_calls}", "one")
+    b0 = Bt(f"_ge_and_{And.num_calls}", ans_true, ans_false)
+    m0.add_next(ge0)
+    ge0.add_next(b0)
+    return (m0, ans_true, ans_false)
+
+
 def test_min(m, n):
     """
     Stores in the variable 'answer' the minimum of 'm' and 'n'
@@ -26,7 +92,6 @@ def test_min(m, n):
     return env.get("answer")
 
 
-@dotgen(ofile_prefix="archive")
 def test_fib(n):
     """
     Stores in the variable 'answer' the n-th number of the Fibonacci sequence.
@@ -56,7 +121,6 @@ def test_fib(n):
     return env.get("answer")
 
 
-@dotgen(ofile_prefix="archive")
 def test_min3(x, y, z):
     """
     Stores in the variable 'answer' the minimum of 'x', 'y' and 'z'
@@ -89,7 +153,6 @@ def test_min3(x, y, z):
     return env.get("answer")
 
 
-@dotgen(ofile_prefix="archive")
 def test_div(m, n):
     """
     Stores in the variable 'answer' the integer division of 'm' and 'n'.
@@ -133,7 +196,7 @@ def test_div(m, n):
             "aux_m": abs(m),
             "aux_n": abs(n),
             "neg_n": -abs(n),
-            "ans_sign": (m < 0) != (n < 0),
+            "ans_is_neg": (m < 0) != (n < 0),
         }
     )
 
@@ -176,15 +239,15 @@ def test_div(m, n):
     dec_n_from_m = Add("aux_m", "aux_m", "neg_n")
     # quotient += 1
     inc_q = Add("answer", "answer", "one")
-    # aux_m_ge_n <- m >= n
+    # aux_m_ge_n = m >= n
     aux_m_ge_n = Geq("aux_m_ge_n", "aux_m", "aux_n")
     # ----------------------------------------------------------------------- #
 
-    # m_ne_zero <- m != 0
+    # m_ne_zero = m != 0
     m_ne_zero, ne_true, ne_false = Ne("m_ne_zero", "aux_m", "zero")
-    # ans_sign_and_m_ne_zero <- ans_sign AND m_ne_zero
+    # ans_sign_and_m_ne_zero = ans_is_neg AND m_ne_zero
     ans_sign_and_m_ne_zero, and_true, and_false = And(
-        "ans_sign_and_m_ne_zero", "ans_sign", "m_ne_zero"
+        "ans_sign_and_m_ne_zero", "ans_is_neg", "m_ne_zero"
     )
 
     # tmp = (quotient + 1)
@@ -193,16 +256,16 @@ def test_div(m, n):
     update_ans = Mul("answer", "ans_plus_one", "neg_one")
 
     # quotient = -quotient
-    neg_ans = Mul("answer", "answer", "neg_one")
+    invert_ans = Mul("answer", "answer", "neg_one")
 
     # elif negative_result ↑
-    if_ans_sign = Bt("ans_sign", neg_ans, ans)
+    if_ans_sign = Bt("ans_is_neg", invert_ans, ans)
 
     while0 = Bt("aux_m_ge_n", dec_n_from_m, m_ne_zero)
 
     ans_plus_one.add_next(update_ans)
     update_ans.add_next(ans)
-    neg_ans.add_next(ans)
+    invert_ans.add_next(ans)
     ne_true.add_next(ans_sign_and_m_ne_zero)
     ne_false.add_next(if_ans_sign)
     and_true.add_next(ans_plus_one)
@@ -215,7 +278,6 @@ def test_div(m, n):
     return env.get("answer")
 
 
-@dotgen(ofile_prefix="archive")
 def test_fact(n):
     """
     Stores in the variable 'answer' the factorial of 'n'.
@@ -244,12 +306,10 @@ def test_fact(n):
     inc_count = Add("count", "count", "one")
     multiply = Mul("answer", "answer", "count")
 
-    # Loop setup
     check_loop = Bt("loop_cond", multiply, answer_init)
     multiply.add_next(inc_count)
     inc_count.add_next(loop_cond)
     loop_cond.add_next(check_loop)
 
-    # Execution
     interp(loop_cond, env)
     return env.get("answer")
