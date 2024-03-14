@@ -32,19 +32,12 @@ class DotMaker:
         raise TypeError(f"{cls.__name__} cannot be subclassed.")
 
     @staticmethod
-    def enable(output_file: int | str | bytes | PathLike[str] | PathLike[bytes] | None):
+    def enable():
         """
         Enables the generation of dot code from instructions and functions like
         `my_inst.add_next(...)`. No code will be generated while DotMaker is
         disabled, which is the default starting state.
-
-        An optional `output_file` may be provided to this function, to be used
-        by `DotMaker.write()`. However, if a different file path is passed to
-        `DotMaker.write()`, that one takes precedence over this one.
         """
-        if output_file is not None:
-            DotMaker._ofile = output_file
-
         DotMaker._is_active = True
 
     @staticmethod
@@ -74,6 +67,8 @@ class DotMaker:
     @staticmethod
     def write(
         output_file: int | str | bytes | PathLike[str] | PathLike[bytes] | None = None,
+        clear_state: bool = True,
+        disable_after_write: bool = True,
     ):
         """
         If an output_file was passed to `DotMaker.enable()`, the `output_file`
@@ -81,10 +76,17 @@ class DotMaker:
         """
         if output_file is None:
             output_file = DotMaker._ofile
+
         with open(output_file, "w") as ofile:
             ofile.write(DotMaker._dot_new_graph + DotMaker.dot + "\n}\n")
-        DotMaker.dot = ""
-        DotMaker._node_cnt = 0
+
+        if clear_state:
+            DotMaker.dot = ""
+            DotMaker._ofile = "/dev/null"
+            DotMaker._node_cnt = 0
+
+        if disable_after_write:
+            DotMaker.disable()
 
     @staticmethod
     def clear(reset_output_file: bool = False):
@@ -158,8 +160,12 @@ def dot(func):
             _append_dot(
                 f'{instance.id} [fontname="Courier New" label="bt {instance.cond}"];\n'
             )
-            _append_dot(f"{instance.id} -> {dstTrue.id};\n")
-            _append_dot(f"{instance.id} -> {dstFalse.id};\n")
+            _append_dot(
+                f'{instance.id} -> {dstTrue.id} [fontname="Courier New" label="True"];\n'
+            )
+            _append_dot(
+                f'{instance.id} -> {dstFalse.id} [fontname="Courier New" label="False"];\n'
+            )
 
         # We assume a BinOp can't have Bt as one of its sources (src0, src1)
         elif itype == "lang.Add":
@@ -220,13 +226,14 @@ def dotgen(
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if not DotMaker.is_enabled():
-                DotMaker.enable(Path(ofile_prefix) / ofile)
+            if DotMaker.is_enabled():
+                DotMaker.write()
+
+            DotMaker.enable()
 
             result = func(*args, **kwargs)
 
-            DotMaker.write()
-            DotMaker.disable()
+            DotMaker.write(output_file=(Path(ofile_prefix) / ofile))
 
             return result
 

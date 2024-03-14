@@ -1,16 +1,8 @@
 from __future__ import annotations
 
+from ControlFlowGraphs.helpers import And, Ne
 from lang import *
-from inst2dot import DotMaker, dotgen
-
-
-def call_counter(func):
-    def wrapper(*args, **kwargs):
-        wrapper.num_calls += 1
-        return func(*args, **kwargs)
-
-    wrapper.num_calls = 0
-    return wrapper
+from inst2dot import dotgen
 
 
 @dotgen(ofile_prefix="archive")
@@ -75,7 +67,6 @@ def test_min3(x, y, z):
         >>> test_min3(5, 4, 3)
         3
     """
-    # DotMaker.enable("test_min3.dot")
     env = Env({"x": x, "y": y, "z": z, "zero": 0})
 
     x_ans = Add("answer", "x", "zero")
@@ -94,197 +85,137 @@ def test_min3(x, y, z):
     x_lt_z.add_next(b0)
     y_lt_z.add_next(b1)
 
-    # DotMaker.write()
-    # DotMaker.disable("test_min3.dot")
-
     interp(x_lt_y, env)
     return env.get("answer")
 
 
-@call_counter
-def Eq(dst, v1, v2, env: Env | None = None):
-    """
-    Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
-    If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
-    """
-
-    if env is not None:
-        env.set("zero", 0)
-        env.set("one", 1)
-        # Otherwise, we assume the user has these definitions
-
-    ans_true = Lth(dst, "zero", "one")
-    ans_false = Lth(dst, "one", "zero")
-
-    lt0 = Lth(f"_lt0_equals_{Eq.num_calls}", v1, v2)
-    lt1 = Lth(f"_lt1_equals_{Eq.num_calls}", v2, v1)
-    bt_second_false = Bt(f"_lt1_equals_{Eq.num_calls}", ans_false, ans_true)
-    bt_first_false = Bt(f"_lt0_equals_{Eq.num_calls}", ans_false, bt_second_false)
-    lt0.add_next(lt1)
-    lt1.add_next(bt_first_false)
-
-    # We return both possible exit nodes, so the caller might assign a next
-    # node to both, even though one of them is unreachable
-    return (lt0, ans_true, ans_false)
-
-
 @dotgen(ofile_prefix="archive")
-def test_equals(x, y):
-    """
-    >>> test_equals(3, 0)
-    False
-    >>> test_equals(0, 3)
-    False
-    >>> test_equals(32, 8)
-    False
-    >>> test_equals(3, 2)
-    False
-    >>> test_equals(2, 3)
-    False
-    >>> test_equals(3, 3)
-    True
-    >>> test_equals(0, 0)
-    True
-    >>> test_equals(1, 1)
-    True
-    >>> test_equals(True, True)
-    True
-    >>> test_equals(False, True)
-    False
-    >>> test_equals(True, False)
-    False
-    >>> test_equals(False, False)
-    True
-    """
-    env = Env({"x": x, "y": y, "one": 1, "zero": 0})
-
-    v1 = "x"
-    v2 = "y"
-
-    lt0, *_ = Eq("answer", v1, v2)
-
-    interp(lt0, env)
-    return env.get("answer")
-
-
-@dotgen(ofile_prefix="archive")
-def test_if_equals(x, y):
-    """
-    >>> test_if_equals(3, 0)
-    False
-    >>> test_if_equals(0, 3)
-    False
-    >>> test_if_equals(32, 8)
-    False
-    >>> test_if_equals(3, 2)
-    False
-    >>> test_if_equals(2, 3)
-    False
-    >>> test_if_equals(3, 3)
-    True
-    >>> test_if_equals(0, 0)
-    True
-    >>> test_if_equals(1, 1)
-    True
-    >>> test_if_equals(True, True)
-    True
-    >>> test_if_equals(False, True)
-    False
-    >>> test_if_equals(True, False)
-    False
-    >>> test_if_equals(False, False)
-    True
-    """
-    env = Env({"x": x, "y": y, "one": 1, "zero": 0})
-
-    v1 = "x"
-    v2 = "y"
-    ans_true = Lth("answer", "zero", "one")
-    ans_false = Lth("answer", "one", "zero")
-
-    lt0, if_true, if_false = Eq("is_eq", v1, v2)
-    b0 = Bt("is_eq", ans_true, ans_false)
-    if_true.add_next(b0)
-    if_false.add_next(b0)
-
-    interp(lt0, env)
-    return env.get("answer")
-
-
-@call_counter
-def And(dst, v1, v2, env: Env | None = None):
-    """
-    Requires either an Env passed or both "zero": 0 and "one": 1 in your Env.
-    If an Env is passed, "zero": 0 and "one": 1 are inserted into it.
-    """
-    if env is not None:
-        env.set("zero", 0)
-        env.set("one", 1)
-        # Otherwise, we assume the user has these definitions
-
-    ans_true = Lth(dst, "zero", "one")
-    ans_false = Lth(dst, "one", "zero")
-
-    m0 = Mul(f"_m0_and_{And.num_calls}", v1, v2)
-    ge0 = Geq(f"_ge_and_{And.num_calls}", f"_m0_and_{And.num_calls}", "one")
-    b0 = Bt(f"_ge_and_{And.num_calls}", ans_true, ans_false)
-    m0.add_next(ge0)
-    ge0.add_next(b0)
-    return m0
-
-
-@dotgen(ofile_prefix="archive")
-def test_and(x, y):
-    """
-    >>> test_and(True, True)
-    True
-    >>> test_and(False, True)
-    False
-    >>> test_and(True, False)
-    False
-    >>> test_and(False, False)
-    False
-    >>> test_and(3, 0)
-    False
-    >>> test_and(0, 3)
-    False
-    >>> test_and(32, 8)
-    True
-    >>> test_and(3, 2)
-    True
-    >>> test_and(2, 3)
-    True
-    >>> test_and(3, 3)
-    True
-    >>> test_and(0, 0)
-    False
-    >>> test_and(1, 1)
-    True
-    """
-    env = Env({"x": x, "y": y, "one": 1, "zero": 0})
-
-    and0 = And("answer", "x", "y")
-
-    interp(and0, env)
-    return env.get("answer")
-
-
 def test_div(m, n):
     """
     Stores in the variable 'answer' the integer division of 'm' and 'n'.
 
     Examples:
-        >>> test_div(30, 4)
-        7
-        >>> test_div(4, 3)
-        1
-        >>> test_div(1, 3)
+        >>> test_div(0, 3)
         0
+        >>> test_div(32, 8)
+        4
+        >>> test_div(3, 2)
+        1
+        >>> test_div(2, 3)
+        0
+        >>> test_div(3, 3)
+        1
+        >>> test_div(128, 64)
+        2
+
+        Implement for negatives too. In python, 3 // 2 == -2
+        >>> test_div(-128, 64)
+        -2
+        >>> test_div(-128, 64)
+        -2
+        >>> test_div(-128, -64)
+        2
+        >>> test_div(-65, 64)
+        -2
+        >>> test_div(-65, -64)
+        1
+        >>> test_div(-3, 2)
+        -2
+        >>> test_div(3, -2)
+        -2
     """
-    # TODO: Implement this method
+    env = Env(
+        {
+            "answer": 0,
+            "neg_one": -1,
+            "zero": 0,
+            "one": 1,
+            "aux_m": abs(m),
+            "aux_n": abs(n),
+            "neg_n": -abs(n),
+            "ans_sign": (m < 0) != (n < 0),
+        }
+    )
+
+    # This was made based on a manual implementation that mimics how Python 3
+    # handles integer division (the // operator). This is the impl:
+    #
+    # def div(m, n):
+    #
+    #    negative_result = (m < 0) != (n < 0)
+    #    m, n = abs(m), abs(n)
+    #
+    #    quotient = 0
+    #    while m >= n:
+    #        m -= n
+    #        quotient += 1
+    #
+    #    # Adjust the quotient for negative results
+    #    if negative_result and m != 0:
+    #        quotient = -(quotient + 1)
+    #    elif negative_result:
+    #        quotient = -quotient
+    #
+    #    return quotient
+    #
+
+    # Note: the helpers used in this function (Ne, And) are just shorthands
+    # that instantiates existing instruction nodes.
+    # They take a "dst" to write the result, and both return a tuple:
+    #   (first_node, exit node if true, exit node if false)
+    # This allows the caller to set the next nodes for each case, sometimes
+    # avoiding the need for an explicit Bt
+
+    ans = Add("answer", "answer", "zero")
+
+    # Some comments above instructions refer to lines in the reference
+    # algorithm above
+
+    # ------------------------- Inside while block -------------------------- #
+    # m -= n
+    dec_n_from_m = Add("aux_m", "aux_m", "neg_n")
+    # quotient += 1
+    inc_q = Add("answer", "answer", "one")
+    # aux_m_ge_n <- m >= n
+    aux_m_ge_n = Geq("aux_m_ge_n", "aux_m", "aux_n")
+    # ----------------------------------------------------------------------- #
+
+    # m_ne_zero <- m != 0
+    m_ne_zero, ne_true, ne_false = Ne("m_ne_zero", "aux_m", "zero")
+    # ans_sign_and_m_ne_zero <- ans_sign AND m_ne_zero
+    ans_sign_and_m_ne_zero, and_true, and_false = And(
+        "ans_sign_and_m_ne_zero", "ans_sign", "m_ne_zero"
+    )
+
+    # tmp = (quotient + 1)
+    ans_plus_one = Add("ans_plus_one", "answer", "one")
+    # quotient = -tmp
+    update_ans = Mul("answer", "ans_plus_one", "neg_one")
+
+    # quotient = -quotient
+    neg_ans = Mul("answer", "answer", "neg_one")
+
+    # elif negative_result ↑
+    if_ans_sign = Bt("ans_sign", neg_ans, ans)
+
+    while0 = Bt("aux_m_ge_n", dec_n_from_m, m_ne_zero)
+
+    ans_plus_one.add_next(update_ans)
+    update_ans.add_next(ans)
+    neg_ans.add_next(ans)
+    ne_true.add_next(ans_sign_and_m_ne_zero)
+    ne_false.add_next(if_ans_sign)
+    and_true.add_next(ans_plus_one)
+    and_false.add_next(if_ans_sign)
+    dec_n_from_m.add_next(inc_q)
+    inc_q.add_next(aux_m_ge_n)
+    aux_m_ge_n.add_next(while0)
+
+    interp(aux_m_ge_n, env)
     return env.get("answer")
 
 
+@dotgen(ofile_prefix="archive")
 def test_fact(n):
     """
     Stores in the variable 'answer' the factorial of 'n'.
@@ -292,6 +223,33 @@ def test_fact(n):
     Examples:
         >>> test_fact(3)
         6
+        >>> test_fact(0)
+        1
+        >>> test_fact(1)
+        1
+        >>> test_fact(5)
+        120
+        >>> test_fact(6)
+        720
+        >>> test_fact(10)
+        3628800
+        >>> test_fact(15)
+        1307674368000
     """
-    # TODO: Implement this method
+    env = Env(
+        {"n": n, "n_plus_one": n + 1, "count": 1, "answer": 1, "one": 1, "zero": 0}
+    )
+    answer_init = Add("answer", "answer", "zero")
+    loop_cond = Lth("loop_cond", "count", "n_plus_one")
+    inc_count = Add("count", "count", "one")
+    multiply = Mul("answer", "answer", "count")
+
+    # Loop setup
+    check_loop = Bt("loop_cond", multiply, answer_init)
+    multiply.add_next(inc_count)
+    inc_count.add_next(loop_cond)
+    loop_cond.add_next(check_loop)
+
+    # Execution
+    interp(loop_cond, env)
     return env.get("answer")

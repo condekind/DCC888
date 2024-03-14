@@ -204,7 +204,7 @@ class Bt(Inst):
     @dot
     def __init__(s, cond, true_dst=None, false_dst=None):
         super().__init__()
-        s.id = f'b{id(s)}'
+        s.id = f"b{id(s)}"
         s.cond = cond
         s.NEXTS = [true_dst, false_dst]
 
