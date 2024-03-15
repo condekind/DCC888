@@ -3,6 +3,7 @@
 /archive
 /tmp
 /tmp.d
+/lists
 
 # IDEs
 /.idea
